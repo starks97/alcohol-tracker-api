@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/starks97/alcohol-tracker-api/internal/services"
+	"github.com/starks97/alcohol-tracker-api/utils"
 )
 
 func UploadImageHandler(c *fiber.Ctx) error {
@@ -28,18 +29,23 @@ func UploadImageHandler(c *fiber.Ctx) error {
 
 	defer fileContent.Close()
 
-	processedImage, err := services.ProcessImage(fileContent)
+	processedImages, err := services.ProcessImage(fileContent)
 	if err != nil {
-		log.Printf("Error to process the image: %v", err)
+		log.Printf("Error processing image: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Error processing image",
 		})
 	}
 
-	println(processedImage)
+	err = utils.SaveImage(processedImages[0], "denoised_image.jpg")
+	if err != nil {
+		log.Printf("Error saving denoised image: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Unable to save denoised image",
+		})
+	}
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"message": "The image was processed and sent successfully to the NN",
-		"image":   processedImage,
 	})
 }

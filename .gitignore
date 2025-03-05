@@ -1,0 +1,35 @@
+# Ignore binary files (compiled Go programs)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+
+# Ignore Go build output
+/bin/
+/obj/
+
+# Ignore temporary files from IDEs
+.vscode/
+.idea/
+
+# Ignore air tmp files (when using air)
+.tmp/
+
+# Ignore Go dependencies and vendor folder
+/vendor/
+
+# Ignore Go module cache (if using Go modules)
+go.sum
+go.mod
+
+# Log files
+*.log
+
+# Ignore system-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore .env files
+.env
