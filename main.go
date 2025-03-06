@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/starks97/alcohol-tracker-api/internal/handlers"
+	"github.com/starks97/alcohol-tracker-api/internal/routes"
 )
 
 func main() {
@@ -15,7 +15,7 @@ func main() {
 		return c.JSON(fiber.Map{"message": "pong"})
 	})
 
-	handlers.SetupRoutes(app)
+	routes.SetupRoutes(app)
 
 	port := "8080"
 	fmt.Println("🚀 Server running on http://localhost:" + port)

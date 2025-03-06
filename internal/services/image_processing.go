@@ -27,8 +27,7 @@ func ProcessImage(imgPath io.Reader) ([][]byte, error) {
 	// Preprocessing steps
 	img = imaging.Grayscale(img)                         // Convert to grayscale
 	img = imaging.AdjustContrast(img, 30)                // Increase contrast
-	img = imaging.Resize(img, 224, 224, imaging.Lanczos) // Resize image
-	img = imaging.AdjustContrast(img, 30)                // Increase contrast again
+	img = imaging.Resize(img, 800, 600, imaging.Lanczos) // Resize image
 
 	denoisedBytes, err := utils.ImageToBytes(img)
 	if err != nil {
