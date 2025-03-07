@@ -13,13 +13,7 @@ import (
 )
 
 func GoogleLoginHandler(c *fiber.Ctx) error {
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Println("Error loading config:", err)
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
-	}
+	cfg := c.Locals("cfg").(*config.Config)
 
 	url := cfg.GoogleLoginConfig.AuthCodeURL("randomstate")
 	c.Status((fiber.StatusSeeOther))
@@ -28,13 +22,7 @@ func GoogleLoginHandler(c *fiber.Ctx) error {
 }
 
 func GoogleCallBack(c *fiber.Ctx) error {
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Println("Error loading config:", err)
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
-	}
+	cfg := c.Locals("cfg").(*config.Config)
 	state := c.Query("state")
 	if state != "randomstate" {
 		return c.SendString("States don't Match!!")

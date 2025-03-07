@@ -7,16 +7,16 @@ import (
 )
 
 type User struct {
-	ID                   string    `json:"id" db:"id"`
-	Email                *string   `json:"email,omitempty" db:"email"`
-	Password             *string   `json:"-" db:"password"`
-	Name                 *string   `json:"name,omitempty" db:"name"`
-	Provider             *string   `json:"provider,omitempty" db:"provider"`
-	ProviderID           *string   `json:"provider_id,omitempty" db:"provider_id"`
-	ProfilePicture       *string   `json:"profile_picture,omitempty" db:"profile_picture"`
-	ProviderRefreshToken *string   `json:"-" db:"provider_refresh_token"`
-	CreatedAt            time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at" db:"updated_at"`
+	ID                   string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Email                *string   `gorm:"uniqueIndex;size:255" json:"email,omitempty"` // Nullable
+	Password             *string   `gorm:"size:255" json:"-"`
+	Name                 *string   `gorm:"size:255" json:"name,omitempty"`
+	Provider             *string   `gorm:"size:255" json:"provider,omitempty"`
+	ProviderID           *string   `gorm:"size:255;uniqueIndex" json:"provider_id,omitempty"`
+	ProfilePicture       *string   `gorm:"size:255" json:"profile_picture,omitempty"`
+	ProviderRefreshToken *string   `gorm:"size:255" json:"-"`
+	CreatedAt            time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt            time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 type RegisterUserSchema struct {

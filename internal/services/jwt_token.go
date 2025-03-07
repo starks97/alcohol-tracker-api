@@ -10,6 +10,24 @@ import (
 	"github.com/starks97/alcohol-tracker-api/internal/models"
 )
 
+// GenerateJwtToken generates a JWT token for the given UserID with a specified TTL and private key.
+//
+// Parameters:
+//   - UserID: The user ID to include in the token claims.
+//   - ttl: The time-to-live of the token in minutes.
+//   - privateKey: The base64-encoded RSA private key used to sign the token.
+//
+// Returns:
+//   - models.TokenDetails: The token details, including the generated token and expiry time.
+//   - error: An error if the token generation fails.
+//
+// Example:
+//
+//	tokenDetails, err := GenerateJwtToken("user123", 60, privateKey)
+//	if err != nil {
+//	    // Handle error
+//	}
+//	// Use tokenDetails
 func GenerateJwtToken(UserID string, ttl int64, privateKey string) (models.TokenDetails, error) {
 	bytesPrivateKey, err := base64.StdEncoding.DecodeString(privateKey)
 	if err != nil {
@@ -54,6 +72,23 @@ func GenerateJwtToken(UserID string, ttl int64, privateKey string) (models.Token
 	return tokenDetails, nil
 }
 
+// VerifyJwtToken verifies a JWT token using the provided public key.
+//
+// Parameters:
+//   - publicKey: The base64-encoded RSA public key used for verification.
+//   - token: The JWT token string to verify.
+//
+// Returns:
+//   - models.TokenDetails: The token details extracted from the token claims if the token is valid.
+//   - error: An error if the token verification fails or the token is invalid.
+//
+// Example:
+//
+//	tokenDetails, err := VerifyJwtToken(publicKey, tokenString)
+//	if err != nil {
+//	    // Handle error
+//	}
+//	// Use tokenDetails
 func VerifyJwtToken(publicKey string, token string) (models.TokenDetails, error) {
 	bytesPublicKey, err := base64.StdEncoding.DecodeString(publicKey)
 	if err != nil {
@@ -89,5 +124,4 @@ func VerifyJwtToken(publicKey string, token string) (models.TokenDetails, error)
 		UserID:    claims.Sub,
 	}
 	return tokenDetails, nil
-
 }
