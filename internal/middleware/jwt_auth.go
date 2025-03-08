@@ -39,8 +39,6 @@ func JWTAuthMiddleware() fiber.Handler {
 
 		redisResult := appState.Redis.Get(ctx, accessTokenUuid)
 
-		//todo implement better way to handle errors using redis.Result.Err() or interface for behaviour
-
 		if redisResult.Err() != nil {
 			log.Println("Failed to get token from redis:", redisResult.Err())
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
