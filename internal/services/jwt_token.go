@@ -28,7 +28,7 @@ import (
 //	    // Handle error
 //	}
 //	// Use tokenDetails
-func GenerateJwtToken(UserID string, ttl int64, privateKey string) (models.TokenDetails, error) {
+func GenerateJwtToken(UserID uuid.UUID, ttl int64, privateKey string) (models.TokenDetails, error) {
 	bytesPrivateKey, err := base64.StdEncoding.DecodeString(privateKey)
 	if err != nil {
 		return models.TokenDetails{}, fmt.Errorf("Error decoding base64: %v", err)
@@ -39,7 +39,7 @@ func GenerateJwtToken(UserID string, ttl int64, privateKey string) (models.Token
 
 	tokenDetails := models.TokenDetails{
 		UserID:    UserID,
-		TokenUUID: uuid.New().String(),
+		TokenUUID: uuid.New(),
 		Token:     nil,
 	}
 
@@ -47,8 +47,8 @@ func GenerateJwtToken(UserID string, ttl int64, privateKey string) (models.Token
 
 	//token claims
 	claims := models.TokenClaims{
-		Sub:       tokenDetails.UserID,
-		TokenUUID: tokenDetails.TokenUUID,
+		Sub:       tokenDetails.UserID.String(),
+		TokenUUID: tokenDetails.TokenUUID.String(),
 		Exp:       *tokenDetails.ExpiresIn,
 		Iat:       timeStamp,
 		Nbf:       timeStamp,
@@ -118,10 +118,20 @@ func VerifyJwtToken(publicKey string, token string) (models.TokenDetails, error)
 		return models.TokenDetails{}, fmt.Errorf("invalid token")
 	}
 
+	tokenUUID, err := uuid.Parse(claims.TokenUUID)
+	if err != nil {
+		return models.TokenDetails{}, fmt.Errorf("invalid token UUID: %v", err)
+	}
+
+	userID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		return models.TokenDetails{}, fmt.Errorf("invalid user ID: %v", err)
+	}
+
 	// Return token details
 	tokenDetails := models.TokenDetails{
-		TokenUUID: claims.TokenUUID,
-		UserID:    claims.Sub,
+		TokenUUID: tokenUUID,
+		UserID:    userID,
 	}
 	return tokenDetails, nil
 }

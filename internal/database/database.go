@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/starks97/alcohol-tracker-api/config"
-	"github.com/starks97/alcohol-tracker-api/internal/models"
+	"github.com/starks97/alcohol-tracker-api/internal/repositories"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -43,7 +43,7 @@ func ConnectDB(cfg *config.Config) *gorm.DB {
 	fmt.Println("✅ Database connected successfully")
 
 	// Perform automatic database migrations for the User model.
-	err = db.AutoMigrate(&models.User{})
+	err = db.AutoMigrate(&repositories.User{})
 	if err != nil {
 		log.Fatalf("Migration failed: %v", err)
 	}

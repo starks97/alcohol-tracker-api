@@ -6,19 +6,6 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-type User struct {
-	ID                   string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Email                *string   `gorm:"uniqueIndex;size:255" json:"email,omitempty"` // Nullable
-	Password             *string   `gorm:"size:255" json:"-"`
-	Name                 *string   `gorm:"size:255" json:"name,omitempty"`
-	Provider             *string   `gorm:"size:255" json:"provider,omitempty"`
-	ProviderID           *string   `gorm:"size:255;uniqueIndex" json:"provider_id,omitempty"`
-	ProfilePicture       *string   `gorm:"size:255" json:"profile_picture,omitempty"`
-	ProviderRefreshToken *string   `gorm:"size:255" json:"-"`
-	CreatedAt            time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt            time.Time `gorm:"autoUpdateTime" json:"updated_at"`
-}
-
 type RegisterUserSchema struct {
 	Email                string    `json:"email" db:"email" validate:"required,email"`
 	Password             *string   `json:"password,omitempty" db:"password" validate:"omitempty,min=8,max=100,regexp=^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=]).{8,100}$"`
