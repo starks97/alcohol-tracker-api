@@ -9,12 +9,17 @@ import (
 
 	"github.com/starks97/alcohol-tracker-api/config"
 	"github.com/starks97/alcohol-tracker-api/internal/database"
+	"github.com/starks97/alcohol-tracker-api/internal/errors"
 	"github.com/starks97/alcohol-tracker-api/internal/routes"
 	"github.com/starks97/alcohol-tracker-api/internal/state"
 )
 
 func main() {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
+			return errors.NewCustomErrorResponse(ctx, err)
+		},
+	})
 	//helps with context
 	ctx := context.Background()
 

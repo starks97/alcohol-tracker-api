@@ -39,3 +39,19 @@ func (ur *UserRepository) GetUserByID(id uuid.UUID) (*User, error) {
 	}
 	return &user, nil
 }
+
+func (usr *UserRepository) GetUserByProvider(id string) (*User, error) {
+	var user User
+	if err := usr.db.Where("provider_id = ?", id).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (usr *UserRepository) GetUserByEmail(email string) (*User, error) {
+	var user User
+	if err := usr.db.Where("email = ?", email).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
