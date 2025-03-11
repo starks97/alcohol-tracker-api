@@ -26,6 +26,10 @@ type JwtMiddlewareResponse struct {
 	User  UserResponse `json:"user"`
 }
 
+type LoginResponse struct {
+	AccessToken string `json:"access_token"`
+}
+
 type SuccessResponse struct {
 	Status string      `json:"status"`
 	Data   interface{} `json:"data"`

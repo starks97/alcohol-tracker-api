@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 
 	"github.com/starks97/alcohol-tracker-api/config"
 	"github.com/starks97/alcohol-tracker-api/internal/database"
-	"github.com/starks97/alcohol-tracker-api/internal/errors"
+	"github.com/starks97/alcohol-tracker-api/internal/exceptions"
 	"github.com/starks97/alcohol-tracker-api/internal/routes"
 	"github.com/starks97/alcohol-tracker-api/internal/state"
 )
@@ -17,11 +19,12 @@ import (
 func main() {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
-			return errors.NewCustomErrorResponse(ctx, err)
+			return exceptions.NewCustomErrorResponse(ctx, err)
 		},
 	})
 	//helps with context
 	ctx := context.Background()
+	httpClient := &http.Client{}
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -36,15 +39,26 @@ func main() {
 	db := database.ConnectDB(cfg)
 
 	appState := &state.AppState{
-		DB:     db,
-		Redis:  redisClient,
-		Config: cfg,
+		DB:         db,
+		Redis:      redisClient,
+		Config:     cfg,
+		HttpClient: httpClient,
 	}
 	app.Use(func(c *fiber.Ctx) error {
 		c.Locals("appState", appState)
 		c.Locals("ctx", ctx)
 		return c.Next()
 	})
+
+	app.Use(cors.New(
+		cors.Config{
+			AllowOrigins:     appState.Config.ClientOrigin,
+			AllowHeaders:     "Authorization, Content-Type, Accept, Access-Control-Allow-Origin",
+			MaxAge:           3600,
+			AllowMethods:     "GET,POST,PUT,DELETE,PATCH",
+			AllowCredentials: true,
+		},
+	))
 
 	routes.SetupRoutes(app, appState)
 

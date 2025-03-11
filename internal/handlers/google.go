@@ -3,13 +3,20 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log"
-	"net/http"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/starks97/alcohol-tracker-api/config"
+	"gorm.io/gorm"
+
+	"github.com/starks97/alcohol-tracker-api/internal/exceptions"
 	"github.com/starks97/alcohol-tracker-api/internal/models"
+	"github.com/starks97/alcohol-tracker-api/internal/repositories"
+	"github.com/starks97/alcohol-tracker-api/internal/responses"
+	"github.com/starks97/alcohol-tracker-api/internal/state"
+	"github.com/starks97/alcohol-tracker-api/internal/utils"
 )
 
 // GoogleLoginHandler initiates the Google OAuth2 login flow.
@@ -22,10 +29,26 @@ import (
 // Returns:
 //   - error: An error if the redirection fails, or nil if successful.
 func GoogleLoginHandler(c *fiber.Ctx) error {
-	cfg := c.Locals("cfg").(*config.Config)
+	appState := c.Locals("appState").(*state.AppState)
+
+	state, err := utils.GenerateRandomString(32)
+	if err != nil {
+		log.Print("can not generate random state", err)
+		return fmt.Errorf("GenerateRandomString: %w", exceptions.NewCustomErrorResponse(c, exceptions.ErrTokenNotGenerated))
+	}
+
+	cookie := fiber.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HTTPOnly: true,
+		Secure:   true,
+		SameSite: "localhost",
+	}
+
+	c.Cookie(&cookie)
 
 	// Generate the authorization URL using a fixed state value.
-	url := cfg.GoogleLoginConfig.AuthCodeURL("randomstate")
+	url := appState.Config.GoogleLoginConfig.AuthCodeURL(state)
 
 	// Redirect the user to the generated URL with a "See Other" status.
 	c.Status(fiber.StatusSeeOther)
@@ -35,46 +58,48 @@ func GoogleLoginHandler(c *fiber.Ctx) error {
 	return c.JSON(url)
 }
 
-// GoogleCallBack handles the callback from Google OAuth2 after the user authorizes the application.
-// It verifies the state parameter, exchanges the authorization code for an access token,
-// retrieves user information from Google's userinfo endpoint, and returns the user data as JSON.
+// GoogleCallBack handles the callback from Google's OAuth 2.0 authorization server.
+// It verifies the state parameter to prevent CSRF attacks, exchanges the authorization code
+// for an access token, retrieves user information from Google, and either creates a new user
+// or logs in an existing user. Finally, it generates JWT tokens and sets a refresh token cookie.
 //
 // Parameters:
 //   - c: *fiber.Ctx - The Fiber context.
 //
 // Returns:
-//   - error: An error if any step fails (state verification, token exchange, user info retrieval, unmarshaling),
-//     or nil if successful.
+//   - error: An error if any step of the process fails, or nil if successful.
 func GoogleCallBack(c *fiber.Ctx) error {
-	cfg := c.Locals("cfg").(*config.Config)
+	// Retrieve application state and context from Fiber locals.
+	appState := c.Locals("appState").(*state.AppState)
+	ctx := c.Locals("ctx").(context.Context)
 
-	// Verify the state parameter to prevent CSRF attacks.
-	state := c.Query("state")
-	if state != "randomstate" {
+	// Initialize user repository.
+	userRepo := repositories.NewUserRepository(appState.DB)
+
+	// Retrieve the state parameter from the cookie to prevent CSRF attacks.
+	cookieState := c.Cookies("oauth_state")
+
+	// Retrieve the authorization code and state from the query parameters.
+	code := c.Query("code")
+	queryState := c.Query("state")
+
+	// Verify that the state from the cookie matches the state from the query parameters.
+	if cookieState != queryState {
 		return c.SendString("States don't Match!!")
 	}
 
-	// Extract the authorization code from the query parameters.
-	code := c.Query("code")
-
-	// Exchange the authorization code for an access token.
-	token, err := cfg.GoogleLoginConfig.Exchange(context.Background(), code)
+	// Exchange the authorization code for an access token from Google.
+	token, err := appState.Config.GoogleLoginConfig.Exchange(context.Background(), code)
 	if err != nil {
 		log.Println("Failed to exchange token:", err)
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "failed",
-			"message": "Failed to exchange token",
-		})
+		return exceptions.NewCustomErrorResponse(c, exceptions.ErrExchangeToken)
 	}
 
 	// Retrieve user information from Google's userinfo endpoint using the access token.
-	res, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
+	res, err := appState.HttpClient.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
 	if err != nil {
 		log.Println("Failed to get user info:", err)
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "failed",
-			"message": "Failed to get user info",
-		})
+		return exceptions.NewCustomErrorResponse(c, exceptions.ErrUserNotFound)
 	}
 	defer res.Body.Close()
 
@@ -82,10 +107,7 @@ func GoogleCallBack(c *fiber.Ctx) error {
 	userData, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Println("Failed to read user info:", err)
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "failed",
-			"message": "Failed to read user info",
-		})
+		return exceptions.NewCustomErrorResponse(c, exceptions.ErrToReadUserInfo)
 	}
 
 	// Unmarshal the user information into a GoogleUser struct.
@@ -93,19 +115,49 @@ func GoogleCallBack(c *fiber.Ctx) error {
 	err = json.Unmarshal(userData, &googleUser)
 	if err != nil {
 		log.Println("Failed to unmarshal user info:", err)
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "failed",
-			"message": "Failed to parse user info",
-		})
+		return exceptions.NewCustomErrorResponse(c, exceptions.ErrToUnmarshalUserInfo)
 	}
 
-	// Return the user data as JSON.
-	return c.JSON(fiber.Map{
-		"name":        googleUser.Name,
-		"email":       googleUser.Email,
-		"picture":     googleUser.VerifiedEmail,
-		"provider_id": googleUser.ID,
-		"provider":    "google",
-		"token":       token.AccessToken,
+	// Check if the user exists in the database.
+	user, err := userRepo.GetUserByProvider("google", googleUser.ID)
+	if err != nil {
+		// If the user does not exist, create a new user.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			provider := "google"
+			user = &repositories.User{
+				Name:                 &googleUser.Name,
+				Email:                &googleUser.Email,
+				ProviderID:           &googleUser.ID,
+				ProfilePicture:       &googleUser.Picture,
+				ProviderRefreshToken: &token.AccessToken,
+				Provider:             &provider,
+			}
+			err = userRepo.CreateUser(user)
+			if err != nil {
+				log.Println("Failed to create user:", err)
+				return exceptions.NewCustomErrorResponse(c, exceptions.ErrUserNotCreated)
+			}
+		} else {
+			// If there was an error other than "record not found", log and return the error.
+			log.Println("Failed to get user:", err)
+			return exceptions.NewCustomErrorResponse(c, fmt.Errorf("failed to get user: %w", err))
+		}
+	}
+
+	// Generate and store JWT tokens in Redis, and set a refresh token cookie.
+	tokenResult, err := utils.StoreTokens(c, appState, ctx, user.ID)
+	if err != nil {
+		return err
+	}
+
+	// Create a login response with the access token.
+	accessToken := responses.LoginResponse{
+		AccessToken: *tokenResult.Token,
+	}
+
+	// Return a success response with the access token.
+	return c.JSON(responses.SuccessResponse{
+		Status: "success",
+		Data:   accessToken,
 	})
 }
