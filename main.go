@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 
 	"github.com/starks97/alcohol-tracker-api/config"
 	"github.com/starks97/alcohol-tracker-api/internal/database"
@@ -38,27 +37,20 @@ func main() {
 
 	db := database.ConnectDB(cfg)
 
+	validator := exceptions.Init()
+
 	appState := &state.AppState{
 		DB:         db,
 		Redis:      redisClient,
 		Config:     cfg,
 		HttpClient: httpClient,
+		Validator:  validator,
 	}
 	app.Use(func(c *fiber.Ctx) error {
 		c.Locals("appState", appState)
 		c.Locals("ctx", ctx)
 		return c.Next()
 	})
-
-	app.Use(cors.New(
-		cors.Config{
-			AllowOrigins:     appState.Config.ClientOrigin,
-			AllowHeaders:     "Authorization, Content-Type, Accept, Access-Control-Allow-Origin",
-			MaxAge:           3600,
-			AllowMethods:     "GET,POST,PUT,DELETE,PATCH",
-			AllowCredentials: true,
-		},
-	))
 
 	routes.SetupRoutes(app, appState)
 
