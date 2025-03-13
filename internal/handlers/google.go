@@ -132,7 +132,7 @@ func GoogleCallBack(c *fiber.Ctx) error {
 				ProviderRefreshToken: &token.AccessToken,
 				Provider:             &provider,
 			}
-			err = userRepo.CreateUser(user)
+			_, err = userRepo.CreateUser(user)
 			if err != nil {
 				log.Println("Failed to create user:", err)
 				return exceptions.NewCustomErrorResponse(c, exceptions.ErrUserNotCreated)

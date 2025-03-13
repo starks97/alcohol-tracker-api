@@ -44,8 +44,11 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 //
 // Returns:
 //   - error: An error if the creation fails.
-func (ur *UserRepository) CreateUser(user *User) error {
-	return ur.db.Create(user).Error
+func (ur *UserRepository) CreateUser(user *User) (*User, error) {
+	if err := ur.db.Create(user).Error; err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 // GetUserByID retrieves a user from the database by ID.

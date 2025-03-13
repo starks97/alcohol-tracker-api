@@ -7,36 +7,32 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-func validatePassword(fl validator.FieldLevel) bool {
-	password, ok := fl.Field().Interface().(string)
-	if !ok {
-		return false
-	}
+func ValidatePassword(password string) []string {
+	passwordErrors := []string{}
 
 	if len(password) < 8 || len(password) > 100 {
-		return false
+		passwordErrors = append(passwordErrors, "Password must be between 8 and 100 characters")
 	}
-
-	hasUpper := false
-	hasSpecial := false
-	hasDigit := false
-	hasLower := false
 
 	specialChars := "!@#$%^&*()_+-=\\"
 
-	for _, char := range password {
-		if char >= 'A' && char <= 'Z' {
-			hasUpper = true
-		} else if strings.ContainsRune(specialChars, char) {
-			hasSpecial = true
-		} else if char >= '0' && char <= '9' {
-			hasDigit = true
-		} else if char >= 'a' && char <= 'z' {
-			hasLower = true
-		}
+	if !strings.ContainsAny(password, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+		passwordErrors = append(passwordErrors, "Password must contain at least one uppercase letter")
 	}
 
-	return hasUpper && hasSpecial && hasDigit && hasLower
+	if !strings.ContainsAny(password, specialChars) {
+		passwordErrors = append(passwordErrors, "Password must contain at least one special character")
+	}
+
+	if !strings.ContainsAny(password, "0123456789") {
+		passwordErrors = append(passwordErrors, "Password must contain at least one digit")
+	}
+
+	if !strings.ContainsAny(password, "abcdefghijklmnopqrstuvwxyz") {
+		passwordErrors = append(passwordErrors, "Password must contain at least one lowercase letter")
+	}
+
+	return passwordErrors
 }
 
 func Init() *validator.Validate {
@@ -45,7 +41,13 @@ func Init() *validator.Validate {
 		log.Fatal("Failed to initialize validator")
 	}
 
-	validate.RegisterValidation("password", validatePassword)
+	validate.RegisterValidation("password", func(fl validator.FieldLevel) bool {
+		password, ok := fl.Field().Interface().(string)
+		if !ok {
+			return false
+		}
+		return len(ValidatePassword(password)) == 0
+	})
 
 	return validate
 }

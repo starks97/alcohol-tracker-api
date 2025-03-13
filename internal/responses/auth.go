@@ -31,6 +31,7 @@ type LoginResponse struct {
 }
 
 type SuccessResponse struct {
-	Status string      `json:"status"`
-	Data   interface{} `json:"data"`
+	Status  string      `json:"status"`
+	Data    interface{} `json:"data,omitempty"`
+	Message *string     `json:"message,omitempty"`
 }
