@@ -18,7 +18,7 @@ import (
 func main() {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
-			return exceptions.NewCustomErrorResponse(ctx, err)
+			return exceptions.HandlerErrorResponse(ctx, err)
 		},
 	})
 	//helps with context

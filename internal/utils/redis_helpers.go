@@ -34,7 +34,7 @@ func GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx contex
 
 	// Check for Redis errors.
 	if cmd.Err() != nil {
-		return "", exceptions.NewCustomErrorResponse(c, exceptions.ErrRedisGet)
+		return "", exceptions.HandlerErrorResponse(c, exceptions.ErrRedisGet)
 	}
 
 	// Get the retrieved value.
@@ -42,12 +42,12 @@ func GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx contex
 
 	// Check if the retrieved value is empty (key not found).
 	if redisValue == "" {
-		return "", exceptions.NewCustomErrorResponse(c, exceptions.ErrRedisNotFound)
+		return "", exceptions.HandlerErrorResponse(c, exceptions.ErrRedisNotFound)
 	}
 
 	// Compare the retrieved value with the expected value.
 	if redisValue != expectedValue {
-		return "", exceptions.NewCustomErrorResponse(c, exceptions.ErrTokenMismatch)
+		return "", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenMismatch)
 	}
 
 	// Return the retrieved value if it matches the expected value.
@@ -72,7 +72,7 @@ func setRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context,
 
 	// Check for Redis errors.
 	if cmd.Err() != nil {
-		return exceptions.NewCustomErrorResponse(c, exceptions.ErrRedisSet)
+		return exceptions.HandlerErrorResponse(c, exceptions.ErrRedisSet)
 	}
 
 	// Return nil if the Redis operation is successful.
@@ -100,14 +100,14 @@ func StoreTokens(c *fiber.Ctx, appState *state.AppState, ctx context.Context, us
 	generateAccessToken, err := services.GenerateJwtToken(userID, appState.Config.AccessTokenMaxAge, appState.Config.AccessTokenPrivateKey)
 	if err != nil {
 		log.Println("Failed to generate access token:", err)
-		return models.TokenDetails{}, fmt.Errorf("StoreTokens: %w", exceptions.NewCustomErrorResponse(c, exceptions.ErrTokenNotGenerated))
+		return models.TokenDetails{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
 	}
 
 	// Generate refresh token.
 	generateRefreshToken, err := services.GenerateJwtToken(userID, appState.Config.RefreshTokenMaxAge, appState.Config.RefreshTokenPrivateKey)
 	if err != nil {
 		log.Println("Failed to generate refresh token:", err)
-		return models.TokenDetails{}, fmt.Errorf("StoreTokens: %w", exceptions.NewCustomErrorResponse(c, exceptions.ErrTokenNotGenerated))
+		return models.TokenDetails{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
 	}
 
 	// Store access token in Redis.

@@ -44,7 +44,7 @@ func JWTAuthMiddleware() fiber.Handler {
 		// Check if the bearer token is missing.
 		if bearerToken == "" {
 			// Return a custom error response indicating that the token is missing.
-			return exceptions.NewCustomErrorResponse(c, exceptions.ErrTokenMissing)
+			return exceptions.HandlerErrorResponse(c, exceptions.ErrTokenMissing)
 		}
 
 		// Remove the "Bearer " prefix from the token.
@@ -54,7 +54,7 @@ func JWTAuthMiddleware() fiber.Handler {
 		verifyToken, err := services.VerifyJwtToken(appState.Config.AccessTokenPublicKey, token)
 		if err != nil {
 			// Return a custom error response indicating that token verification failed.
-			return exceptions.NewCustomErrorResponse(c, exceptions.ErrTokenVerification)
+			return exceptions.HandlerErrorResponse(c, exceptions.ErrTokenVerification)
 		}
 
 		// Retrieve the access token UUID from the verified token.
@@ -71,20 +71,20 @@ func JWTAuthMiddleware() fiber.Handler {
 		userID, err := uuid.Parse(redisValue)
 		if err != nil {
 			// Return a custom error response indicating that parsing the user ID failed.
-			return exceptions.NewCustomErrorResponse(c, exceptions.ErrUserIDParse)
+			return exceptions.HandlerErrorResponse(c, exceptions.ErrUserIDParse)
 		}
 
 		// Retrieve the user from the database using the user ID.
 		user, err := userRepo.GetUserByID(userID)
 		if err != nil {
 			// Return a custom error response indicating that the user was not found.
-			return exceptions.NewCustomErrorResponse(c, exceptions.ErrUserNotFound)
+			return exceptions.HandlerErrorResponse(c, exceptions.ErrUserNotFound)
 		}
 
 		// Verify that the user ID from Redis matches the user ID from the database.
 		if user.ID != userID {
 			// Return a custom error response indicating a user ID mismatch.
-			return exceptions.NewCustomErrorResponse(c, exceptions.ErrUserIDMismatch)
+			return exceptions.HandlerErrorResponse(c, exceptions.ErrUserIDMismatch)
 		}
 
 		// Create a JWT middleware response.
@@ -92,8 +92,8 @@ func JWTAuthMiddleware() fiber.Handler {
 			Token: accessTokenUuid,
 			User: responses.UserResponse{
 				ID:         user.ID,
-				Email:      *user.Email,
-				Name:       *user.Name,
+				Email:      user.Email,
+				Name:       user.Name,
 				CreatedAt:  user.CreatedAt,
 				UpdatedAt:  user.UpdatedAt,
 				Provider:   *user.Provider,

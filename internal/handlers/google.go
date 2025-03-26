@@ -34,7 +34,7 @@ func GoogleLoginHandler(c *fiber.Ctx) error {
 	state, err := utils.GenerateRandomString(32)
 	if err != nil {
 		log.Print("can not generate random state", err)
-		return fmt.Errorf("GenerateRandomString: %w", exceptions.NewCustomErrorResponse(c, exceptions.ErrTokenNotGenerated))
+		return fmt.Errorf("GenerateRandomString: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
 	}
 
 	cookie := fiber.Cookie{
@@ -92,14 +92,14 @@ func GoogleCallBack(c *fiber.Ctx) error {
 	token, err := appState.Config.GoogleLoginConfig.Exchange(context.Background(), code)
 	if err != nil {
 		log.Println("Failed to exchange token:", err)
-		return exceptions.NewCustomErrorResponse(c, exceptions.ErrExchangeToken)
+		return exceptions.HandlerErrorResponse(c, exceptions.ErrExchangeToken)
 	}
 
 	// Retrieve user information from Google's userinfo endpoint using the access token.
 	res, err := appState.HttpClient.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
 	if err != nil {
 		log.Println("Failed to get user info:", err)
-		return exceptions.NewCustomErrorResponse(c, exceptions.ErrUserNotFound)
+		return exceptions.HandlerErrorResponse(c, exceptions.ErrUserNotFound)
 	}
 	defer res.Body.Close()
 
@@ -107,7 +107,7 @@ func GoogleCallBack(c *fiber.Ctx) error {
 	userData, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Println("Failed to read user info:", err)
-		return exceptions.NewCustomErrorResponse(c, exceptions.ErrToReadUserInfo)
+		return exceptions.HandlerErrorResponse(c, exceptions.ErrToReadUserInfo)
 	}
 
 	// Unmarshal the user information into a GoogleUser struct.
@@ -115,32 +115,43 @@ func GoogleCallBack(c *fiber.Ctx) error {
 	err = json.Unmarshal(userData, &googleUser)
 	if err != nil {
 		log.Println("Failed to unmarshal user info:", err)
-		return exceptions.NewCustomErrorResponse(c, exceptions.ErrToUnmarshalUserInfo)
+		return exceptions.HandlerErrorResponse(c, exceptions.ErrToUnmarshalUserInfo)
 	}
 
 	// Check if the user exists in the database.
-	user, err := userRepo.GetUserByProvider("google", googleUser.ID)
+	user, err := userRepo.GetUserByEmail(googleUser.Email)
+	provider := "google"
+
 	if err != nil {
-		// If the user does not exist, create a new user.
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			provider := "google"
 			user = &repositories.User{
-				Name:                 &googleUser.Name,
-				Email:                &googleUser.Email,
-				ProviderID:           &googleUser.ID,
-				ProfilePicture:       &googleUser.Picture,
-				ProviderRefreshToken: &token.AccessToken,
-				Provider:             &provider,
+				Name:           googleUser.Name,
+				Email:          googleUser.Email,
+				Provider:       &provider,
+				ProviderID:     &googleUser.ID,
+				ProfilePicture: &googleUser.Picture,
 			}
 			_, err = userRepo.CreateUser(user)
 			if err != nil {
 				log.Println("Failed to create user:", err)
-				return exceptions.NewCustomErrorResponse(c, exceptions.ErrUserNotCreated)
+				return exceptions.HandlerErrorResponse(c, exceptions.ErrUserNotCreated)
 			}
 		} else {
-			// If there was an error other than "record not found", log and return the error.
 			log.Println("Failed to get user:", err)
-			return exceptions.NewCustomErrorResponse(c, fmt.Errorf("failed to get user: %w", err))
+			return exceptions.HandlerErrorResponse(c, fmt.Errorf("failed to get user: %w", err))
+		}
+	} else {
+		//user exist update user
+		user.Provider = &provider
+		user.ProviderID = &googleUser.ID
+		user.ProfilePicture = &googleUser.Picture
+		user.Name = googleUser.Name
+		user.ProviderRefreshToken = &token.AccessToken
+
+		_, err = userRepo.UpdateUser(user)
+		if err != nil {
+			log.Println("Failed to update user:", err)
+			return exceptions.HandlerErrorResponse(c, exceptions.ErrUserNotUpdated)
 		}
 	}
 
