@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/starks97/alcohol-tracker-api/internal/dtos"
 	"github.com/starks97/alcohol-tracker-api/internal/exceptions"
-	"github.com/starks97/alcohol-tracker-api/internal/models"
 	"github.com/starks97/alcohol-tracker-api/internal/services"
 	"github.com/starks97/alcohol-tracker-api/internal/state"
 )
@@ -91,7 +91,7 @@ func setRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context,
 // Returns:
 //   - models.TokenDetails: Token details containing the generated access token.
 //   - error: An error if any step of the process fails.
-func StoreTokens(c *fiber.Ctx, appState *state.AppState, ctx context.Context, userID uuid.UUID) (models.TokenDetails, error) {
+func StoreTokens(c *fiber.Ctx, appState *state.AppState, ctx context.Context, userID uuid.UUID) (dtos.TokenDetailsDto, error) {
 	// Calculate access and refresh token expiration times.
 	accessTokenMaxAge := time.Duration(appState.Config.AccessTokenMaxAge) * time.Minute
 	refreshTokenMaxAge := time.Duration(appState.Config.RefreshTokenMaxAge) * time.Minute
@@ -100,26 +100,26 @@ func StoreTokens(c *fiber.Ctx, appState *state.AppState, ctx context.Context, us
 	generateAccessToken, err := services.GenerateJwtToken(userID, appState.Config.AccessTokenMaxAge, appState.Config.AccessTokenPrivateKey)
 	if err != nil {
 		log.Println("Failed to generate access token:", err)
-		return models.TokenDetails{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
+		return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
 	}
 
 	// Generate refresh token.
 	generateRefreshToken, err := services.GenerateJwtToken(userID, appState.Config.RefreshTokenMaxAge, appState.Config.RefreshTokenPrivateKey)
 	if err != nil {
 		log.Println("Failed to generate refresh token:", err)
-		return models.TokenDetails{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
+		return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
 	}
 
 	// Store access token in Redis.
 	err = setRedisValue(c, appState.Redis, ctx, generateAccessToken.TokenUUID.String(), generateAccessToken.UserID.String(), accessTokenMaxAge)
 	if err != nil {
-		return models.TokenDetails{}, fmt.Errorf("StoreTokens: %w", err)
+		return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", err)
 	}
 
 	// Store refresh token in Redis.
 	err = setRedisValue(c, appState.Redis, ctx, generateRefreshToken.TokenUUID.String(), generateRefreshToken.UserID.String(), refreshTokenMaxAge)
 	if err != nil {
-		return models.TokenDetails{}, fmt.Errorf("StoreTokens: %w", err)
+		return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", err)
 	}
 
 	// Create refresh token cookie.
@@ -137,7 +137,7 @@ func StoreTokens(c *fiber.Ctx, appState *state.AppState, ctx context.Context, us
 	c.Cookie(refreshCookie)
 
 	// Return access token details.
-	return models.TokenDetails{
+	return dtos.TokenDetailsDto{
 		Token: generateAccessToken.Token,
 	}, nil
 }

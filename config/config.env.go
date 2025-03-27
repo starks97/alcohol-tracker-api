@@ -9,6 +9,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/endpoints"
 	"golang.org/x/oauth2/google"
 )
 
@@ -25,6 +26,9 @@ type Config struct {
 	GoogleLoginConfig      oauth2.Config
 	GoogleClientID         string
 	GoogleClientSecret     string
+	GithubLoginConfig      oauth2.Config
+	GithubClientID         string
+	GithubClientSecret     string
 	RedisURL               string
 	RedisPassword          string
 	RedisAddress           string
@@ -65,6 +69,8 @@ func LoadConfig() (*Config, error) {
 		PostgresSSLMode:        getEnv("POSTGRES_SSLMODE"),
 		GoogleClientID:         getEnv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret:     getEnv("GOOGLE_CLIENT_SECRET"),
+		GithubClientID:         getEnv("GITHUB_CLIENT_ID"),
+		GithubClientSecret:     getEnv("GITHUB_CLIENT_SECRET"),
 		RedisURL:               getEnv("REDIS_URL"),
 		RedisAddress:           getEnv("REDIS_ADDRESS"),
 		RedisPassword:          getEnv("REDIS_PASSWORD"),
@@ -82,12 +88,24 @@ func LoadConfig() (*Config, error) {
 	config.GoogleLoginConfig = oauth2.Config{
 		ClientID:     config.GoogleClientID,
 		ClientSecret: config.GoogleClientSecret,
-		RedirectURL:  "http://localhost:8080/auth/google_callback",
+		RedirectURL:  "http://localhost:8080/auth/google/callback",
 		Scopes: []string{
 			"https://www.googleapis.com/auth/userinfo.email",
 			"https://www.googleapis.com/auth/userinfo.profile",
 		},
 		Endpoint: google.Endpoint,
+	}
+
+	config.GithubLoginConfig = oauth2.Config{
+		ClientID:     config.GithubClientID,
+		ClientSecret: config.GithubClientSecret,
+		RedirectURL:  "http://localhost:8080/auth/github/callback",
+		Scopes: []string{
+			"read:user",
+			"user:email",
+			"repo",
+		},
+		Endpoint: endpoints.GitHub,
 	}
 
 	return config, nil

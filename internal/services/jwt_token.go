@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/starks97/alcohol-tracker-api/internal/models"
+	"github.com/starks97/alcohol-tracker-api/internal/dtos"
 )
 
 // GenerateJwtToken generates a JWT token for the given UserID with a specified TTL and private key.
@@ -28,16 +28,16 @@ import (
 //	    // Handle error
 //	}
 //	// Use tokenDetails
-func GenerateJwtToken(UserID uuid.UUID, ttl int64, privateKey string) (models.TokenDetails, error) {
+func GenerateJwtToken(UserID uuid.UUID, ttl int64, privateKey string) (dtos.TokenDetailsDto, error) {
 	bytesPrivateKey, err := base64.StdEncoding.DecodeString(privateKey)
 	if err != nil {
-		return models.TokenDetails{}, fmt.Errorf("Error decoding base64: %v", err)
+		return dtos.TokenDetailsDto{}, fmt.Errorf("Error decoding base64: %v", err)
 	}
 	timeStamp := time.Now().Unix()
 
 	expirationTime := time.Now().Add(time.Duration(ttl) * time.Minute).Unix()
 
-	tokenDetails := models.TokenDetails{
+	tokenDetails := dtos.TokenDetailsDto{
 		UserID:    UserID,
 		TokenUUID: uuid.New(),
 		Token:     nil,
@@ -46,7 +46,7 @@ func GenerateJwtToken(UserID uuid.UUID, ttl int64, privateKey string) (models.To
 	tokenDetails.ExpiresIn = &expirationTime
 
 	//token claims
-	claims := models.TokenClaims{
+	claims := dtos.TokenClaimsDto{
 		Sub:       tokenDetails.UserID.String(),
 		TokenUUID: tokenDetails.TokenUUID.String(),
 		Exp:       *tokenDetails.ExpiresIn,
@@ -89,19 +89,19 @@ func GenerateJwtToken(UserID uuid.UUID, ttl int64, privateKey string) (models.To
 //	    // Handle error
 //	}
 //	// Use tokenDetails
-func VerifyJwtToken(publicKey string, token string) (models.TokenDetails, error) {
+func VerifyJwtToken(publicKey string, token string) (dtos.TokenDetailsDto, error) {
 	bytesPublicKey, err := base64.StdEncoding.DecodeString(publicKey)
 	if err != nil {
-		return models.TokenDetails{}, fmt.Errorf("Error decoding base64: %v", err)
+		return dtos.TokenDetailsDto{}, fmt.Errorf("Error decoding base64: %v", err)
 	}
 
 	publicKeyObj, err := jwt.ParseRSAPublicKeyFromPEM(bytesPublicKey)
 	if err != nil {
-		return models.TokenDetails{}, fmt.Errorf("error parsing public key: %v", err)
+		return dtos.TokenDetailsDto{}, fmt.Errorf("error parsing public key: %v", err)
 	}
 
 	// Verify and decode the token
-	claims := models.TokenClaims{}
+	claims := dtos.TokenClaimsDto{}
 
 	tokenObj, err := jwt.ParseWithClaims(token, &claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
@@ -111,25 +111,25 @@ func VerifyJwtToken(publicKey string, token string) (models.TokenDetails, error)
 	})
 
 	if err != nil {
-		return models.TokenDetails{}, fmt.Errorf("error verifying token: %v", err)
+		return dtos.TokenDetailsDto{}, fmt.Errorf("error verifying token: %v", err)
 	}
 
 	if !tokenObj.Valid {
-		return models.TokenDetails{}, fmt.Errorf("invalid token")
+		return dtos.TokenDetailsDto{}, fmt.Errorf("invalid token")
 	}
 
 	tokenUUID, err := uuid.Parse(claims.TokenUUID)
 	if err != nil {
-		return models.TokenDetails{}, fmt.Errorf("invalid token UUID: %v", err)
+		return dtos.TokenDetailsDto{}, fmt.Errorf("invalid token UUID: %v", err)
 	}
 
 	userID, err := uuid.Parse(claims.Sub)
 	if err != nil {
-		return models.TokenDetails{}, fmt.Errorf("invalid user ID: %v", err)
+		return dtos.TokenDetailsDto{}, fmt.Errorf("invalid user ID: %v", err)
 	}
 
 	// Return token details
-	tokenDetails := models.TokenDetails{
+	tokenDetails := dtos.TokenDetailsDto{
 		TokenUUID: tokenUUID,
 		UserID:    userID,
 	}
