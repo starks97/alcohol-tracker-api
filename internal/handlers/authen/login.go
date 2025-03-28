@@ -21,6 +21,8 @@ func LoginHandler(c *fiber.Ctx) error {
 
 	userRepo := repositories.NewUserRepository(appState.DB)
 
+	tokenService := utils.NewTokenService(appState)
+
 	var userDataFromReq dtos.LoginUserDto
 
 	ctx := c.Locals("ctx").(context.Context)
@@ -51,7 +53,7 @@ func LoginHandler(c *fiber.Ctx) error {
 		return exceptions.HandlerErrorResponse(c, exceptions.ErrInvalidCredentials)
 	}
 
-	tokenResult, err := utils.StoreTokens(c, appState, ctx, userInDB.ID)
+	tokenResult, err := tokenService.StoreToken(c, ctx, userInDB.ID, "both")
 	if err != nil {
 		return err
 	}

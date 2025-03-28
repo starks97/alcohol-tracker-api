@@ -87,6 +87,8 @@ func OAuthCallBackHandler(c *fiber.Ctx) error {
 	ctx := c.Locals("ctx").(context.Context)
 	provider := c.Params("provider")
 
+	tokenService := utils.NewTokenService(appState)
+
 	authStrategy, err := strategies.NewAuthStrategy(appState, provider)
 	if err != nil {
 		return exceptions.HandlerErrorResponse(c, err)
@@ -166,7 +168,7 @@ func OAuthCallBackHandler(c *fiber.Ctx) error {
 	}
 
 	// Generate and store JWT tokens in Redis, and set a refresh token cookie.
-	tokenResult, err := utils.StoreTokens(c, appState, ctx, user.ID)
+	tokenResult, err := tokenService.StoreToken(c, ctx, user.ID, "both")
 	if err != nil {
 		return err
 	}

@@ -9,12 +9,14 @@ import (
 	"github.com/starks97/alcohol-tracker-api/internal/state"
 )
 
+// strategy pattern design
 type AuthStrategy interface {
 	GenerateAuthURL(state string) string
 	ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error)
 	GetUserInfo(token *oauth2.Token) ([]byte, error)
 }
 
+// factory pattern design
 func NewAuthStrategy(appState *state.AppState, provider string) (AuthStrategy, error) {
 	switch provider {
 	case "github":

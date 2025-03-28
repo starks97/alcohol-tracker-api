@@ -16,21 +16,94 @@ import (
 	"github.com/starks97/alcohol-tracker-api/internal/state"
 )
 
-// GetAndCompareRedisValue retrieves a value from Redis using the provided key,
-// compares it to the expected value, and returns the retrieved value if they match.
-//
-// Parameters:
-//   - c: *fiber.Ctx - The Fiber context for error responses.
-//   - redisClient: *redis.Client - The Redis client.
-//   - ctx: context.Context - The context for Redis operations.
-//   - expectedValue: string - The key to retrieve from Redis and the value to compare against.
-//
-// Returns:
-//   - string: The retrieved value from Redis if it matches the expected value.
-//   - error: An error if the Redis operation fails, the key is not found, or the values don't match.
-func GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, expectedValue string) (string, error) {
+type RedisCmdMethos interface {
+	StoreToken(c *fiber.Ctx, ctx context.Context, userID uuid.UUID, tokenMethodKey string) (dtos.TokenDetailsDto, error)
+	GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, expectedValue string) (string, error)
+	SetRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, key string, value string, expiration time.Duration) error
+}
+
+// TokenService struct to manage token operations
+type TokenService struct {
+	AppState *state.AppState
+}
+
+// NewTokenService initializes a new token service
+func NewTokenService(appState *state.AppState) RedisCmdMethos {
+	return &TokenService{AppState: appState}
+}
+
+func (ts *TokenService) StoreToken(c *fiber.Ctx, ctx context.Context, userID uuid.UUID, tokenMethodKey string) (dtos.TokenDetailsDto, error) {
+	var accessToken, refreshToken string
+	var accessUUID, refreshUUID uuid.UUID
+	var accessMaxAge, refreshMaxAge time.Duration
+	var accessPrivateKey, refreshPrivateKey string
+	var accessMaxAgeInt64, refreshMaxAgeInt64 int64
+
+	// Fetch configurations
+	accessMaxAge = time.Duration(ts.AppState.Config.AccessTokenMaxAge) * time.Minute
+	accessPrivateKey = ts.AppState.Config.AccessTokenPrivateKey
+	accessMaxAgeInt64 = ts.AppState.Config.AccessTokenMaxAge
+
+	refreshMaxAge = time.Duration(ts.AppState.Config.RefreshTokenMaxAge) * time.Minute
+	refreshPrivateKey = ts.AppState.Config.RefreshTokenPrivateKey
+	refreshMaxAgeInt64 = ts.AppState.Config.RefreshTokenMaxAge
+
+	if tokenMethodKey == "access" || tokenMethodKey == "both" {
+		// Generate Access Token
+		generatedAccessToken, err := services.GenerateJwtToken(userID, accessMaxAgeInt64, accessPrivateKey)
+		if err != nil {
+			log.Println("Failed to generate access token:", err)
+			return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
+		}
+
+		accessToken = *generatedAccessToken.Token
+		accessUUID = generatedAccessToken.TokenUUID
+
+		// Store Access Token in Redis
+		err = ts.SetRedisValue(c, ts.AppState.Redis, ctx, accessUUID.String(), userID.String(), accessMaxAge)
+		if err != nil {
+			return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", err)
+		}
+	}
+
+	if tokenMethodKey == "refresh" || tokenMethodKey == "both" {
+		// Generate Refresh Token
+		generatedRefreshToken, err := services.GenerateJwtToken(userID, refreshMaxAgeInt64, refreshPrivateKey)
+		if err != nil {
+			log.Println("Failed to generate refresh token:", err)
+			return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
+		}
+
+		refreshToken = *generatedRefreshToken.Token
+		refreshUUID = generatedRefreshToken.TokenUUID
+
+		// Store Refresh Token in Redis
+		err = ts.SetRedisValue(c, ts.AppState.Redis, ctx, refreshUUID.String(), userID.String(), refreshMaxAge)
+		if err != nil {
+			return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", err)
+		}
+
+		// Set refresh token as a cookie
+		refreshCookie := &fiber.Cookie{
+			Name:     "refresh_token",
+			Value:    refreshToken,
+			Expires:  time.Now().Add(refreshMaxAge),
+			HTTPOnly: true,
+			Secure:   false, // Fetch from config
+			Path:     "/",
+			Domain:   "localhost", // Fetch from config
+		}
+		c.Cookie(refreshCookie)
+	}
+
+	return dtos.TokenDetailsDto{
+		Token: &accessToken,
+	}, nil
+}
+
+func (ts *TokenService) GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, expectedValue string) (string, error) {
 	// Retrieve the value from Redis using the provided key.
-	cmd := redisClient.Get(ctx, expectedValue)
+	cmd := ts.AppState.Redis.Get(ctx, expectedValue)
 
 	// Check for Redis errors.
 	if cmd.Err() != nil {
@@ -54,90 +127,14 @@ func GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx contex
 	return redisValue, nil
 }
 
-// setRedisValue sets a key-value pair in Redis with the specified expiration time.
-//
-// Parameters:
-//   - c: *fiber.Ctx - The Fiber context for error responses.
-//   - redisClient: *redis.Client - The Redis client.
-//   - ctx: context.Context - The context for Redis operations.
-//   - key: string - The key to set in Redis.
-//   - value: string - The value to set in Redis.
-//   - expiration: time.Duration - The expiration time for the key-value pair.
-//
-// Returns:
-//   - error: An error if the Redis operation fails.
-func setRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, key string, value string, expiration time.Duration) error {
-	// Set the key-value pair in Redis with the specified expiration time.
-	cmd := redisClient.SetEx(ctx, key, value, expiration)
+func (ts *TokenService) SetRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, key string, value string, expiration time.Duration) error {
+	// Set the value in Redis with the provided key and expiration.
+	cmd := ts.AppState.Redis.Set(ctx, key, value, expiration)
 
 	// Check for Redis errors.
 	if cmd.Err() != nil {
 		return exceptions.HandlerErrorResponse(c, exceptions.ErrRedisSet)
 	}
 
-	// Return nil if the Redis operation is successful.
 	return nil
-}
-
-// StoreTokens generates JWT tokens for the given user ID, stores them in Redis,
-// and sets a refresh token cookie.
-//
-// Parameters:
-//   - c: *fiber.Ctx - The Fiber context for error responses.
-//   - appState: *state.AppState - The application state containing configuration and Redis client.
-//   - ctx: context.Context - The context for token generation and Redis operations.
-//   - userID: uuid.UUID - The user ID to generate tokens for.
-//
-// Returns:
-//   - models.TokenDetails: Token details containing the generated access token.
-//   - error: An error if any step of the process fails.
-func StoreTokens(c *fiber.Ctx, appState *state.AppState, ctx context.Context, userID uuid.UUID) (dtos.TokenDetailsDto, error) {
-	// Calculate access and refresh token expiration times.
-	accessTokenMaxAge := time.Duration(appState.Config.AccessTokenMaxAge) * time.Minute
-	refreshTokenMaxAge := time.Duration(appState.Config.RefreshTokenMaxAge) * time.Minute
-
-	// Generate access token.
-	generateAccessToken, err := services.GenerateJwtToken(userID, appState.Config.AccessTokenMaxAge, appState.Config.AccessTokenPrivateKey)
-	if err != nil {
-		log.Println("Failed to generate access token:", err)
-		return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
-	}
-
-	// Generate refresh token.
-	generateRefreshToken, err := services.GenerateJwtToken(userID, appState.Config.RefreshTokenMaxAge, appState.Config.RefreshTokenPrivateKey)
-	if err != nil {
-		log.Println("Failed to generate refresh token:", err)
-		return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenNotGenerated))
-	}
-
-	// Store access token in Redis.
-	err = setRedisValue(c, appState.Redis, ctx, generateAccessToken.TokenUUID.String(), generateAccessToken.UserID.String(), accessTokenMaxAge)
-	if err != nil {
-		return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", err)
-	}
-
-	// Store refresh token in Redis.
-	err = setRedisValue(c, appState.Redis, ctx, generateRefreshToken.TokenUUID.String(), generateRefreshToken.UserID.String(), refreshTokenMaxAge)
-	if err != nil {
-		return dtos.TokenDetailsDto{}, fmt.Errorf("StoreTokens: %w", err)
-	}
-
-	// Create refresh token cookie.
-	refreshCookie := &fiber.Cookie{
-		Name:     "refresh_token",
-		Value:    *generateRefreshToken.Token,
-		Expires:  time.Now().Add(time.Duration(appState.Config.RefreshTokenMaxAge) * time.Minute),
-		HTTPOnly: true,
-		Secure:   false, // Use config
-		Path:     "/",
-		Domain:   "localhost", // Use config
-	}
-
-	// Set refresh token cookie.
-	c.Cookie(refreshCookie)
-
-	// Return access token details.
-	return dtos.TokenDetailsDto{
-		Token: generateAccessToken.Token,
-	}, nil
 }

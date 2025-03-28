@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -31,6 +32,7 @@ import (
 //	fiber.Handler: A Fiber middleware handler.
 func JWTAuthMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		log.Println("JWTAuthMiddleware triggered")
 		// Retrieve the bearer token from the "Authorization" header.
 		bearerToken := c.Get("Authorization")
 
@@ -40,6 +42,8 @@ func JWTAuthMiddleware() fiber.Handler {
 
 		// Create a new UserRepository instance.
 		userRepo := repositories.NewUserRepository(appState.DB)
+
+		tokenService := utils.NewTokenService(appState)
 
 		// Check if the bearer token is missing.
 		if bearerToken == "" {
@@ -61,7 +65,7 @@ func JWTAuthMiddleware() fiber.Handler {
 		accessTokenUuid := verifyToken.TokenUUID
 
 		// Retrieve and compare the user ID from Redis.
-		redisValue, err := utils.GetAndCompareRedisValue(c, appState.Redis, ctx, accessTokenUuid.String())
+		redisValue, err := tokenService.GetAndCompareRedisValue(c, appState.Redis, ctx, accessTokenUuid.String())
 		if err != nil {
 			// Return the error from GetAndCompareRedisValue, which already handles error responses.
 			return err
