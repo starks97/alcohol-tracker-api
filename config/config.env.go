@@ -17,12 +17,6 @@ type Config struct {
 	DatabaseUrl            string
 	ClientOrigin           string
 	Domain                 string
-	PostgresUser           string
-	PostgresPassword       string
-	PostgresDB             string
-	PostgresHost           string
-	PostgresPort           string
-	PostgresSSLMode        string
 	GoogleLoginConfig      oauth2.Config
 	GoogleClientID         string
 	GoogleClientSecret     string
@@ -30,8 +24,6 @@ type Config struct {
 	GithubClientID         string
 	GithubClientSecret     string
 	RedisURL               string
-	RedisPassword          string
-	RedisAddress           string
 	AccessTokenPrivateKey  string
 	AccessTokenPublicKey   string
 	AccessTokenExpiredIn   string
@@ -61,19 +53,11 @@ func LoadConfig() (*Config, error) {
 		DatabaseUrl:            getEnv("DATABASE_URL"),
 		ClientOrigin:           getEnv("CLIENT_ORIGIN"),
 		Domain:                 getEnv("DOMAIN"),
-		PostgresUser:           getEnv("POSTGRES_USER"),
-		PostgresPassword:       getEnv("POSTGRES_PASSWORD"),
-		PostgresDB:             getEnv("POSTGRES_DB"),
-		PostgresHost:           getEnv("POSTGRES_HOST"),
-		PostgresPort:           getEnv("POSTGRES_PORT"),
-		PostgresSSLMode:        getEnv("POSTGRES_SSLMODE"),
 		GoogleClientID:         getEnv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret:     getEnv("GOOGLE_CLIENT_SECRET"),
 		GithubClientID:         getEnv("GITHUB_CLIENT_ID"),
 		GithubClientSecret:     getEnv("GITHUB_CLIENT_SECRET"),
 		RedisURL:               getEnv("REDIS_URL"),
-		RedisAddress:           getEnv("REDIS_ADDRESS"),
-		RedisPassword:          getEnv("REDIS_PASSWORD"),
 		AccessTokenPrivateKey:  getEnv("ACCESS_TOKEN_PRIVATE_KEY"),
 		AccessTokenPublicKey:   getEnv("ACCESS_TOKEN_PUBLIC_KEY"),
 		AccessTokenExpiredIn:   getEnv("ACCESS_TOKEN_EXPIRED_IN"),

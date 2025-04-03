@@ -33,7 +33,7 @@ func RefreshTokenHandler(c *fiber.Ctx) error {
 
 	accessTokenUuid := verifyToken.TokenUUID
 
-	redisValue, err := tokenService.GetAndCompareRedisValue(c, appState.Redis, ctx, accessTokenUuid.String())
+	redisValue, err := tokenService.GetRedisValue(c, appState.Redis, ctx, accessTokenUuid.String())
 	if err != nil {
 		// Return the error from GetAndCompareRedisValue, which already handles error responses.
 		return err

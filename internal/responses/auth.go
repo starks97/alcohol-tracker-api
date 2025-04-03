@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/starks97/alcohol-tracker-api/internal/entities"
 )
 
 type UserResponse struct {
@@ -22,8 +23,8 @@ type ErrorResponse struct {
 }
 
 type JwtMiddlewareResponse struct {
-	Token uuid.UUID    `json:"token"`
-	User  UserResponse `json:"user"`
+	AccessToken uuid.UUID     `json:"access_token"`
+	User        entities.User `json:"user"`
 }
 
 type LoginResponse struct {

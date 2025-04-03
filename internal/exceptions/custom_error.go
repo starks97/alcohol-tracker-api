@@ -17,6 +17,7 @@ var (
 	ErrTokenVerification   = fmt.Errorf("Your session has expired or the token is invalid. Please log in again to get a new token.")
 	ErrRedisGet            = fmt.Errorf("We couldn't retrieve your authentication token. Please try logging in again.")
 	ErrRedisNotFound       = fmt.Errorf("We couldn’t find your token. Please log in again to obtain a new one.")
+	ErrRedisDel            = fmt.Errorf("We couldn't delete the given keys, please check the Redis server.")
 	ErrTokenMismatch       = fmt.Errorf("The token does not match our records. Please log in again.")
 	ErrUserNotFound        = fmt.Errorf("No user found with the provided information. Please check your input and try again.")
 	ErrUserIDMismatch      = fmt.Errorf("You are not authorized to perform this action. Please check if you're logged in with the correct account.")
@@ -45,6 +46,7 @@ var ErrorMapping = map[error]struct {
 	ErrTokenVerification:   {http.StatusUnauthorized},
 	ErrRedisGet:            {http.StatusUnauthorized},
 	ErrRedisNotFound:       {http.StatusUnauthorized},
+	ErrRedisDel:            {http.StatusInternalServerError},
 	ErrTokenMismatch:       {http.StatusUnauthorized},
 	ErrUserIDParse:         {http.StatusUnauthorized},
 	ErrUserNotFound:        {http.StatusNotFound},

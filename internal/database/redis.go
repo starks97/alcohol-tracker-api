@@ -18,12 +18,14 @@ import (
 //   - *redis.Client: A pointer to the initialized Redis client.
 //   - error: An error if the Redis connection or ping fails, or nil if successful.
 func NewRedisClient(cfg *config.Config, ctx context.Context) (*redis.Client, error) {
+
+	url := cfg.RedisURL
+	opts, err := redis.ParseURL(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
+	}
 	// Create a new Redis client using the provided configuration.
-	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.RedisAddress,
-		Password: cfg.RedisPassword,
-		DB:       0, // Use the default database (0).
-	})
+	client := redis.NewClient(opts)
 
 	// Ping the Redis server to verify the connection.
 	if err := client.Ping(ctx).Err(); err != nil {

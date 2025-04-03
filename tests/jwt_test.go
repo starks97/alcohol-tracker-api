@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/google/uuid"
@@ -12,19 +13,38 @@ var testTokenPrivateBase64 string = "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUV
 
 var testTokenPublicBase64 string = "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUFzekJpL2FLcFNkTnR3Mm9IS09vawpkZ3JGZXNkSWNPVEJOdWtDM2RSNWtHNE8yV0tZY3BsaVRBVjBNNm9GV3hiMnFESzVwaFlPbTF3aEFmcDcxUFBXClBuS205Rm5heWYzMktCS2UzOVdNTkVSMjdaSWlZQUJvWGxrMCtLZ2tSbDBKUEhFTTRKQjVlUENLRXBTTHVXL0UKU1haYXhUdVcrQnJ5WldGNHNySlltbzZiVm5EK3RFMjRRRVNjR3Z5WEFObENSNHp1NytxZ2NJM0wwVW9Xc2k5RApOZ2F3STdPdHk1OXFMdkZhQ1h1UzNMY0V2dXFBVGUzWkJtckw1ak9JN2hZVk1yMTc1OENSMjdqcTJpNFZ0MlNlCnpqaFY4dkZUTGtCZE41NHRGVkNhdW96VjN0WFN0b0J1RGFmbTk3aDhOVEx1cXRKMzdjeXQvVkl4YUM4QlFmdy8KNHdJREFRQUIKLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg=="
 
+func decodeBase64Key(encodedKey string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(encodedKey)
+}
+
 func TestGenerateAndVerifyJwtToken(t *testing.T) {
+
+	privateKey, err := decodeBase64Key(testTokenPrivateBase64)
+	assert.NoError(t, err, "Failed to decode private key")
+
+	publicKey, err := decodeBase64Key(testTokenPublicBase64)
+	assert.NoError(t, err, "Failed to decode public key")
 
 	userID := uuid.New()
 	ttl := int64(30) // 30 minutes
 
-	tokenDetails, err := services.GenerateJwtToken(userID, ttl, testTokenPrivateBase64)
-	assert.NoError(t, err)
-	assert.NotNil(t, tokenDetails.Token)
+	t.Run("Generate JWT Token", func(t *testing.T) {
+		tokenDetails, err := services.GenerateJwtToken(userID, ttl, string(privateKey))
+		assert.NoError(t, err, "Error generating JWT token")
+		assert.NotNil(t, tokenDetails, "Token details should not be nil")
+		assert.NotNil(t, tokenDetails.Token, "Generated token should not be nil")
+		assert.NotEmpty(t, tokenDetails.TokenUUID, "TokenUUID should not be empty")
+	})
 
-	verifiedTokenDetails, err := services.VerifyJwtToken(testTokenPublicBase64, *tokenDetails.Token)
-	assert.NoError(t, err)
-	assert.Equal(t, userID, verifiedTokenDetails.UserID)
-	assert.Equal(t, tokenDetails.TokenUUID, verifiedTokenDetails.TokenUUID)
+	t.Run("Verify JWT Token", func(t *testing.T) {
+		tokenDetails, _ := services.GenerateJwtToken(userID, ttl, string(privateKey))
+		verifiedTokenDetails, err := services.VerifyJwtToken(string(publicKey), *tokenDetails.Token)
+
+		assert.NoError(t, err, "Error verifying JWT token")
+		assert.NotNil(t, verifiedTokenDetails, "Verified token details should not be nil")
+		assert.Equal(t, userID, verifiedTokenDetails.UserID, "UserID should match")
+		assert.Equal(t, tokenDetails.TokenUUID, verifiedTokenDetails.TokenUUID, "TokenUUID should match")
+	})
 }
 
 func TestGenerateJwtToken_InvalidPrivateKey(t *testing.T) {

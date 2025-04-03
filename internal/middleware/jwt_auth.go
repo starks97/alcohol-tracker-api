@@ -65,7 +65,7 @@ func JWTAuthMiddleware() fiber.Handler {
 		accessTokenUuid := verifyToken.TokenUUID
 
 		// Retrieve and compare the user ID from Redis.
-		redisValue, err := tokenService.GetAndCompareRedisValue(c, appState.Redis, ctx, accessTokenUuid.String())
+		redisValue, err := tokenService.GetRedisValue(c, appState.Redis, ctx, accessTokenUuid.String())
 		if err != nil {
 			// Return the error from GetAndCompareRedisValue, which already handles error responses.
 			return err
@@ -91,24 +91,12 @@ func JWTAuthMiddleware() fiber.Handler {
 			return exceptions.HandlerErrorResponse(c, exceptions.ErrUserIDMismatch)
 		}
 
-		// Create a JWT middleware response.
-		jwtResponse := responses.JwtMiddlewareResponse{
-			Token: accessTokenUuid,
-			User: responses.UserResponse{
-				ID:         user.ID,
-				Email:      user.Email,
-				Name:       user.Name,
-				CreatedAt:  user.CreatedAt,
-				UpdatedAt:  user.UpdatedAt,
-				Provider:   *user.Provider,
-				ProviderID: *user.ProviderID,
-			},
+		var jwtMiddlewareRes = responses.JwtMiddlewareResponse{
+			User:        *user,
+			AccessToken: accessTokenUuid,
 		}
 
-		// Return a success response with the user information.
-		return c.JSON(responses.SuccessResponse{
-			Status: "success",
-			Data:   jwtResponse,
-		})
+		c.Locals("mdlData", &jwtMiddlewareRes)
+		return c.Next()
 	}
 }

@@ -18,8 +18,9 @@ import (
 
 type RedisCmdMethos interface {
 	StoreToken(c *fiber.Ctx, ctx context.Context, userID uuid.UUID, tokenMethodKey string) (dtos.TokenDetailsDto, error)
-	GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, expectedValue string) (string, error)
+	GetRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, expectedValue string) (string, error)
 	SetRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, key string, value string, expiration time.Duration) error
+	RemoveRedisKeys(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, keys ...string) error
 }
 
 // TokenService struct to manage token operations
@@ -47,6 +48,8 @@ func (ts *TokenService) StoreToken(c *fiber.Ctx, ctx context.Context, userID uui
 	refreshMaxAge = time.Duration(ts.AppState.Config.RefreshTokenMaxAge) * time.Minute
 	refreshPrivateKey = ts.AppState.Config.RefreshTokenPrivateKey
 	refreshMaxAgeInt64 = ts.AppState.Config.RefreshTokenMaxAge
+
+	fiberHelperCookie := NewFiberHelper(ts.AppState)
 
 	if tokenMethodKey == "access" || tokenMethodKey == "both" {
 		// Generate Access Token
@@ -84,16 +87,7 @@ func (ts *TokenService) StoreToken(c *fiber.Ctx, ctx context.Context, userID uui
 		}
 
 		// Set refresh token as a cookie
-		refreshCookie := &fiber.Cookie{
-			Name:     "refresh_token",
-			Value:    refreshToken,
-			Expires:  time.Now().Add(refreshMaxAge),
-			HTTPOnly: true,
-			Secure:   false, // Fetch from config
-			Path:     "/",
-			Domain:   "localhost", // Fetch from config
-		}
-		c.Cookie(refreshCookie)
+		fiberHelperCookie.SetCookie(c, "refresh_token", refreshToken, refreshMaxAge)
 	}
 
 	return dtos.TokenDetailsDto{
@@ -101,7 +95,7 @@ func (ts *TokenService) StoreToken(c *fiber.Ctx, ctx context.Context, userID uui
 	}, nil
 }
 
-func (ts *TokenService) GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, expectedValue string) (string, error) {
+func (ts *TokenService) GetRedisValue(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, expectedValue string) (string, error) {
 	// Retrieve the value from Redis using the provided key.
 	cmd := ts.AppState.Redis.Get(ctx, expectedValue)
 
@@ -112,16 +106,6 @@ func (ts *TokenService) GetAndCompareRedisValue(c *fiber.Ctx, redisClient *redis
 
 	// Get the retrieved value.
 	redisValue := cmd.Val()
-
-	// Check if the retrieved value is empty (key not found).
-	if redisValue == "" {
-		return "", exceptions.HandlerErrorResponse(c, exceptions.ErrRedisNotFound)
-	}
-
-	// Compare the retrieved value with the expected value.
-	if redisValue != expectedValue {
-		return "", exceptions.HandlerErrorResponse(c, exceptions.ErrTokenMismatch)
-	}
 
 	// Return the retrieved value if it matches the expected value.
 	return redisValue, nil
@@ -134,6 +118,16 @@ func (ts *TokenService) SetRedisValue(c *fiber.Ctx, redisClient *redis.Client, c
 	// Check for Redis errors.
 	if cmd.Err() != nil {
 		return exceptions.HandlerErrorResponse(c, exceptions.ErrRedisSet)
+	}
+
+	return nil
+}
+
+func (ts *TokenService) RemoveRedisKeys(c *fiber.Ctx, redisClient *redis.Client, ctx context.Context, keys ...string) error {
+	cmd := ts.AppState.Redis.Del(ctx, keys...)
+
+	if cmd.Err() != nil {
+		return exceptions.HandlerErrorResponse(c, exceptions.ErrRedisDel)
 	}
 
 	return nil

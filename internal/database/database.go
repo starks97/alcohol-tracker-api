@@ -24,17 +24,8 @@ var DB *gorm.DB
 //   - *gorm.DB: A pointer to the initialized GORM database connection.
 //   - It also sets the global var DB.
 func ConnectDB(cfg *config.Config) *gorm.DB {
-	// Construct the Data Source Name (DSN) for the database connection.
-	dsn := cfg.DatabaseUrl
-	if dsn == "" {
-		dsn = fmt.Sprintf(
-			"host=%s user=%s password=%s dbname=%s port=%s sslmode=require TimeZone=UTC",
-			cfg.PostgresHost, cfg.PostgresUser, cfg.PostgresPassword, cfg.PostgresDB, cfg.PostgresPort,
-		)
-	}
-
 	// Open a connection to the PostgreSQL database using GORM.
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(cfg.DatabaseUrl), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
